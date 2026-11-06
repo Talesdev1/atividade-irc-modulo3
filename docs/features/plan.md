@@ -9,8 +9,6 @@ Implementar 100% da topologia e das configurações da "Atividade Módulo 3" via
 
 ---
 
-## 🗺️ Milestones e Tarefas (Tasks)
-
 ### Milestone 1: Setup do Ambiente e Base de Código
 **Objetivo:** Preparar o ambiente local de automação e garantir comunicação autenticada com o servidor GNS3.
 - [x] **Task 1.1:** Inicializar repositório e ambiente virtual (`venv`).
@@ -21,45 +19,41 @@ Implementar 100% da topologia e das configurações da "Atividade Módulo 3" via
 
 > **Pré-requisito técnico (API v3 + token no `.env`):** O servidor local roda GNS3 3.1.0a6 e expõe `/v3/*`; `/v2/*` responde 404 e `/v3/projects` exige autenticação (401 `Not authenticated`). O `gns3fy 0.8.0` aponta para `/v2` por padrão, então o conector deve ser criado com `api_version=3` e usar o header `Authorization: Bearer <access_token>`. A autenticação ocorre exclusivamente pelo `access_token` lido de `GNS3_ACCESS_TOKEN` no `.env`; não há login por usuário/senha nem obtenção de token dentro do script.
 
-### Milestone 2: Orquestração Lógica (Topologia via `gns3fy`)
-**Objetivo:** Criar os equipamentos e cabeamentos no GNS3 sem intervenção manual na interface gráfica.
-- [ ] **Task 2.1:** Desenvolver o script de criação do projeto (`infra/create_project.py`), incluindo verificação de idempotência (checar se o projeto já existe).
-- [ ] **Task 2.2:** Automatizar o provisionamento de nós: 4 Switches EXOS e 10 VPCS (Hosts).
-- [ ] **Task 2.3:** Automatizar a criação de links (cabeamento) de acordo com o mapa de portas do projeto (ex: SW-LACINA porta 22 <-> SW-LSD porta 22).
-- [ ] **Task 2.4:** Criar rotina para iniciar (start) todos os nós do projeto via API.
+### Milestone 2: Orquestração Lógica e Descoberta (Base `.gns3project`)
+**Objetivo:** Carregar a topologia base pré-desenhada, inicializar os equipamentos via API e mapear dinamicamente as portas de console.
+- [x] **Task 2.1:** Estruturar o diretório `base_topology/` para armazenar o arquivo `.gns3project` inicial e configurar o `.gitignore` (ignorando discos virtuais pesados).
+- [ ] **Task 2.2:** Criar o script de orquestração (`infra/setup_lab.py`) para conectar à API e localizar o projeto ativo (ex: `uasc`).
+- [ ] **Task 2.3:** Implementar a rotina para iniciar todos os nós simultaneamente via API (`lab.start_nodes()`).
+- [ ] **Task 2.4:** Extrair as portas de console (Telnet) alocadas pelo GNS3 para cada nó e exportar para o arquivo `inventario_gns3.json`.
 
-### Milestone 3: Provisionamento de Configurações (Via `Netmiko` e `Jinja2`)
-**Objetivo:** Aplicar configurações L2 e L3 nos switches EXOS e IPs nos VPCS.
-- [ ] **Task 3.1:** Desenvolver templates Jinja2 baseados nas normas do STI (Criação de VLANs, associação de portas Tagged/Untagged, roteamento, DHCP).
-- [ ] **Task 3.2:** Escrever script Netmiko (`config/configure_switches.py`) para injetar as configurações no `SW-LACINA` (Core/L3).
-- [ ] **Task 3.3:** Injetar configurações nos switches de acesso (`SW-LSD`, `SW-LSI`, `SW-LIAD`), configurando rotas padrão de gerência.
-- [ ] **Task 3.4:** Criar script/rotina para configurar os IPs estáticos dos VPCS (ADM, NVR, CAM) e ativar o DHCP nos demais.
+### Milestone 3: Provisionamento de Configurações (Netmiko + Jinja2)
+**Objetivo:** Aplicar configurações L2 e L3 nos switches EXOS e IPs nos VPCS, consumindo o inventário dinâmico.
+- [ ] **Task 3.1:** Desenvolver templates Jinja2 baseados nas normas do STI (VLANs, portas Tagged/Untagged, roteamento, DHCP).
+- [ ] **Task 3.2 (Readiness Check):** Implementar rotina de *polling* (Wait-for-Boot) no Netmiko para aguardar o SO EXOS carregar completamente antes de enviar comandos.
+- [ ] **Task 3.3:** Ler o `inventario_gns3.json` e injetar as configurações no `SW-LACINA` (Core/L3) via Netmiko.
+- [ ] **Task 3.4:** Injetar configurações nos switches de acesso (`SW-LSD`, `SW-LSI`, `SW-LIAD`), definindo as rotas padrão de gerência.
+- [ ] **Task 3.5:** Configurar IPs estáticos dos VPCS fixos (ADM, NVR, CAM) e ativar DHCP nos demais (via Netmiko, modo terminal).
 
 ### Milestone 4: Automação dos Testes de Aceite
-**Objetivo:** Executar e validar programaticamente os 6 testes exigidos na proposta.
-- [ ] **Task 4.1:** Script para checar atribuição de IPs via DHCP nos hosts dinâmicos.
-- [ ] **Task 4.2:** Script de validação de Ping para o Gateway (Teste 2).
-- [ ] **Task 4.3:** Script de validação de roteamento Inter-VLANs (Teste 3).
-- [ ] **Task 4.4:** Script de validação da rede de CFTV (Teste 4 e Teste 5 - Isolamento, garantindo que o ping falhe ao tentar acessar outras sub-redes).
-- [ ] **Task 4.5:** Validação de transporte de tronco com mudança temporal de IP (Teste 6).
+**Objetivo:** Validar os 6 testes exigidos pela UFCG executando comandos automatizados nos VPCS via Telnet.
+- [ ] **Task 4.1:** Validar DHCP fazendo parse do comando `ip dhcp` nos hosts dinâmicos via Netmiko.
+- [ ] **Task 4.2:** Validar conectividade (Teste 2) com o Gateway disparando `ping` e lendo a resposta de sucesso no console.
+- [ ] **Task 4.3:** Validar roteamento Inter-VLANs (Teste 3) executando pings cruzados entre laboratórios.
+- [ ] **Task 4.4:** Validar isolamento CFTV (Testes 4 e 5), assegurando ping ok CAM->NVR e confirmando falha (`timeout` ou erro) de outras redes para a VLAN 60.
+- [ ] **Task 4.5:** Validar transporte de tronco simulando troca temporal de IP e Gateway (Teste 6).
 
 ### Milestone 5: Gestão de Mudanças (Day 2 Operations)
-**Objetivo:** Criar fluxos de código para os 3 chamados (tickets) de mudança previstos.
-- [ ] **Task 5.1:** Script Chamado 1: Provisionar novo PC `PC-LACINA-SALA` na porta 4 do `SW-LIAD` e reconfigurar a VLAN local.
-- [ ] **Task 5.2:** Script Chamado 2: Suspender link rompido (SW-LACINA <-> SW-LIAD) via API e configurar novo tronco de contingência via `SW-LSI`.
-- [ ] **Task 5.3:** Script Chamado 3: Migrar porta do PC da sala emprestada para o LSI e limpar a VLAN `LIAD` residual do `SW-LSI`.
+**Objetivo:** Automatizar chamados reais usando abordagem híbrida (API para links/nós + CLI para configuração e desativação L2).
+- [ ] **Task 5.1 (Chamado 1):** Usar `gns3fy` para adicionar o nó VPCS `PC-LACINA-SALA` e linká-lo à porta 4 do `SW-LIAD`. Usar Netmiko para associar a porta à VLAN LACINA no switch.
+- [ ] **Task 5.2 (Chamado 2):** Simular rompimento do cabo LACINA-LIAD via CLI (Netmiko) enviando `disable port 24` nos dois switches. Em seguida, usar API para ligar o novo cabo de contingência entre `SW-LSI` e `SW-LIAD` e Netmiko para reconfigurar os troncos.
+- [ ] **Task 5.3 (Chamado 3):** Migrar virtualmente o PC-LIAD-SALA, reconfigurando no Netmiko a porta de acesso do `SW-LSI` e removendo a VLAN `LIAD` residual.
 
 ---
 
-## ✅ Critérios de Aceite (Definition of Done)
-
-Para que uma Milestone seja considerada concluída, as seguintes condições devem ser atendidas:
-1. **Idempotência:** A execução repetida do mesmo script não deve causar erros, duplicar nós ou corromper a configuração atual.
-2. **Modularidade:** Nenhum hardcode de senhas; uso de templates estruturados.
-3. **Isolamento Confirmado:** A VLAN `Cameras` (60) deve estar provada como inacessível pelas demais redes (Falha no ping para hosts externos confirmada).
-4. **Resiliência de Enlaces:** A rede deve manter a conectividade total mesmo após a aplicação do Chamado 2 (rompimento de link).
-
----
+### Diretrizes Arquiteturais Críticas
+1. **Fonte da Verdade:** O arquivo `.gns3project` dita a camada física L1 base.
+2. **Dinamicidade:** Nenhum script Netmiko deve ter portas Telnet com *hardcode*. O arquivo `inventario_gns3.json` é de leitura obrigatória.
+3. **Robustez CLI:** Todos os scripts de configuração devem prever o tempo de boot dos equipamentos (Readiness Check) para evitar falhas de conexão.
 
 ## 🛠️ Estratégia de Validação
 
