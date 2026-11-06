@@ -3,3 +3,9 @@ base_topology/**/project-files/
 base_topology/**/*.qcow2
 base_topology/**/*.bin
 *.vmdk
+
+# Segredos e artefatos gerados localmente
+.env
+inventario_gns3.json
+__pycache__/
+*.pyc

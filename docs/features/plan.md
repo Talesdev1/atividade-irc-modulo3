@@ -12,11 +12,14 @@ Implementar 100% da topologia e das configurações da "Atividade Módulo 3" via
 ## 🗺️ Milestones e Tarefas (Tasks)
 
 ### Milestone 1: Setup do Ambiente e Base de Código
-**Objetivo:** Preparar o ambiente local de automação e garantir comunicação com o servidor GNS3.
-- [ ] **Task 1.1:** Inicializar repositório e ambiente virtual (`venv`).
-- [ ] **Task 1.2:** Instalar dependências (`gns3fy`, `requests`, `netmiko`, `jinja2`, `python-dotenv`).
-- [ ] **Task 1.3:** Criar arquivo `.env` para centralizar variáveis (IP do servidor GNS3, credenciais padrão dos switches).
-- [ ] **Task 1.4:** Escrever script de teste de conexão com a API do GNS3 (`http://localhost:3080`).
+**Objetivo:** Preparar o ambiente local de automação e garantir comunicação autenticada com o servidor GNS3.
+- [x] **Task 1.1:** Inicializar repositório e ambiente virtual (`venv`).
+- [x] **Task 1.2:** Instalar dependências (`gns3fy`, `requests`, `netmiko`, `jinja2`, `python-dotenv`).
+- [x] **Task 1.3:** Criar arquivo `.env` para centralizar variáveis (URL e versão da API do GNS3, `GNS3_ACCESS_TOKEN`, host de console e credenciais padrão dos switches).
+- [x] **Task 1.4:** Ler o `access_token` da variável `GNS3_ACCESS_TOKEN` do `.env` e enviá-lo no header `Authorization: Bearer <access_token>` em todas as chamadas do `gns3fy` (`api_version=3`); o token não deve ser hardcoded nem solicitado pelo script.
+- [x] **Task 1.5:** Escrever script de teste de conexão autenticada com a API do GNS3 (`http://localhost:3080`) — implementado como `setup_lab.py --check` e validado contra o servidor local (GNS3 3.1.0a6, projeto `uasc`, 14 nós).
+
+> **Pré-requisito técnico (API v3 + token no `.env`):** O servidor local roda GNS3 3.1.0a6 e expõe `/v3/*`; `/v2/*` responde 404 e `/v3/projects` exige autenticação (401 `Not authenticated`). O `gns3fy 0.8.0` aponta para `/v2` por padrão, então o conector deve ser criado com `api_version=3` e usar o header `Authorization: Bearer <access_token>`. A autenticação ocorre exclusivamente pelo `access_token` lido de `GNS3_ACCESS_TOKEN` no `.env`; não há login por usuário/senha nem obtenção de token dentro do script.
 
 ### Milestone 2: Orquestração Lógica (Topologia via `gns3fy`)
 **Objetivo:** Criar os equipamentos e cabeamentos no GNS3 sem intervenção manual na interface gráfica.
