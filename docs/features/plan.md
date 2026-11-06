@@ -22,9 +22,10 @@ Implementar 100% da topologia e das configurações da "Atividade Módulo 3" via
 ### Milestone 2: Orquestração Lógica e Descoberta (Base `.gns3project`)
 **Objetivo:** Carregar a topologia base pré-desenhada, inicializar os equipamentos via API e mapear dinamicamente as portas de console.
 - [x] **Task 2.1:** Estruturar o diretório `base_topology/` para armazenar o arquivo `.gns3project` inicial e configurar o `.gitignore` (ignorando discos virtuais pesados).
-- [ ] **Task 2.2:** Criar o script de orquestração (`infra/setup_lab.py`) para conectar à API e localizar o projeto ativo (ex: `uasc`).
-- [ ] **Task 2.3:** Implementar a rotina para iniciar todos os nós simultaneamente via API (`lab.start_nodes()`).
-- [ ] **Task 2.4:** Extrair as portas de console (Telnet) alocadas pelo GNS3 para cada nó e exportar para o arquivo `inventario_gns3.json`.
+- [x] **Task 2.2:** Criar o script de orquestração (`infra/setup_lab.py`) para conectar à API e localizar o projeto ativo (ex: `uasc`). O `setup_lab.py` da raiz permanece como atalho de compatibilidade para o comando do Milestone 1.
+- [x] Task 2.3: Automatizar a criação do cabeamento inicial (links L1) via API (gns3fy), conectando as portas de acesso dos VPCS e os troncos 802.1Q entre os switches conforme o mapa de portas padrão (ex: SW-LACINA portas 22-24). O mapa fica em `infra/topologia.py`; o script expande os adaptadores dos switches quando necessário e não duplica links existentes.
+- [x] **Task 2.4:** Implementar a rotina para iniciar todos os nós simultaneamente via API (`lab.start_nodes()`), aguardando o estado `started` por polling.
+- [x] **Task 2.5:** Extrair as portas de console (Telnet) alocadas pelo GNS3 para cada nó e exportar para o arquivo `inventario_gns3.json`.
 
 ### Milestone 3: Provisionamento de Configurações (Netmiko + Jinja2)
 **Objetivo:** Aplicar configurações L2 e L3 nos switches EXOS e IPs nos VPCS, consumindo o inventário dinâmico.
@@ -51,12 +52,12 @@ Implementar 100% da topologia e das configurações da "Atividade Módulo 3" via
 ---
 
 ### Diretrizes Arquiteturais Críticas
-1. **Fonte da Verdade:** O arquivo `.gns3project` dita a camada física L1 base.
+1. **Fonte da Verdade:** O arquivo `.gns3project` dita os nós da topologia base; o mapa em `infra/topologia.py` dita o cabeamento L1 inicial (acessos e troncos).
 2. **Dinamicidade:** Nenhum script Netmiko deve ter portas Telnet com *hardcode*. O arquivo `inventario_gns3.json` é de leitura obrigatória.
 3. **Robustez CLI:** Todos os scripts de configuração devem prever o tempo de boot dos equipamentos (Readiness Check) para evitar falhas de conexão.
 
 ## 🛠️ Estratégia de Validação
 
-1. **Validação de API (Milestone 2):** Utilizar `requests` para consultar os endpoints do GNS3 Server (`/v2/projects/{id}/nodes`) e garantir que a contagem de nós e links corresponde exatamente à topologia proposta.
+1. **Validação de API (Milestone 2):** Executar `infra/setup_lab.py --validate` para comparar, via API v3 do GNS3, os nomes/tipos dos nós com o `project.gns3` embutido em `base_topology/uasc.gns3project` e os 13 enlaces (10 acessos + 3 troncos) com o mapa de `infra/topologia.py`. A execução local validou 14 nós e 13 links, com todos os nós `started` e o `inventario_gns3.json` exportado com 14 consoles.
 2. **Validação de CLI (Milestone 3):** O script `netmiko` deve capturar a saída de comandos de validação (`show vlan`, `show ipconfig`, `show fdb`) e fazer um *assert* contra os valores esperados.
 3. **Validação End-to-End (Milestone 4):** A biblioteca `netmiko` ou rotinas via console de gerência farão parse dos resultados de comandos `ping` executados a partir dos VPCS. Um retorno contendo `timeout` ou `unreachable` será tratado como **SUCESSO** no teste de isolamento (CFTV) e como **FALHA** nos testes de comunicação Inter-VLAN.
