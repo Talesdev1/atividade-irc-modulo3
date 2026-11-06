@@ -443,9 +443,9 @@ Nenhum computador de laboratório ou estação de trabalho pode conseguir se com
 
 #### 6️⃣ Teste 6: Teste de Flexibilidade e Transporte do Tronco
 
-Muda-se temporariamente o IP do `PC-LACINA` para a faixa do LSD para provar que a porta L2 aceita a reconfiguração e o tronco transporta o tráfego.
+Muda-se temporariamente o IP do `PC-LACINA` para a faixa do LSD para provar a **soberania da Camada 2**: alterar manualmente o IP da placa de rede **não burla** o isolamento imposto pela VLAN.
 
-- **Passo 1 (no VPCS `PC-LACINA`):** Configure um IP fixo livre da faixa do LSD e o gateway do LSD:
+- **Passo 1 (no VPCS `PC-LACINA`):** Configure um IP fixo da faixa do LSD e o gateway do LSD:
     
     ```
     ip 172.20.1.250/25 172.20.1.129
@@ -457,7 +457,8 @@ Muda-se temporariamente o IP do `PC-LACINA` para a faixa do LSD para provar que 
     ping 172.20.1.129
     ```
     
-- **Resultado Esperado:** **Sucesso**.
+- **Resultado Esperado:** **FALHA** (`host not reachable` ou `timeout`).
+- **Justificativa:** O `PC-LACINA` está fisicamente na porta 1 do `SW-LACINA`, associada como `untagged` à VLAN `LACINA` (ID 20). O IP `172.20.1.250/25` pertence à sub-rede do LSD, mas o gateway `172.20.1.129` é a SVI da VLAN `LSD` (ID 10). O ARP do PC é enviado na VLAN 20, onde esse endereço não existe, e o roteador não possui proxy ARP dinâmico. Além disso, mesmo que o ARP fosse respondido, a resposta do `SW-LACINA` para `172.20.1.250` sairia pela rota conectada `172.20.1.128/25` em direção à VLAN 10, nunca retornando ao PC. Para que o ping funcionasse, seria necessário mover a porta 1 para a VLAN `LSD` (`configure vlan LACINA delete ports 1` e `configure vlan LSD add ports 1 untagged`).
 - **Passo 3 (Restauração):** Retorne o PC ao DHCP normal:
     
     ```

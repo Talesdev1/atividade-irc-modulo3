@@ -37,11 +37,11 @@ Implementar 100% da topologia e das configurações da "Atividade Módulo 3" via
 
 ### Milestone 4: Automação dos Testes de Aceite
 **Objetivo:** Validar os 6 testes exigidos pela UFCG executando comandos automatizados nos VPCS via Telnet.
-- [ ] **Task 4.1:** Validar DHCP fazendo parse do comando `ip dhcp` nos hosts dinâmicos via Netmiko.
-- [ ] **Task 4.2:** Validar conectividade (Teste 2) com o Gateway disparando `ping` e lendo a resposta de sucesso no console.
-- [ ] **Task 4.3:** Validar roteamento Inter-VLANs (Teste 3) executando pings cruzados entre laboratórios.
-- [ ] **Task 4.4:** Validar isolamento CFTV (Testes 4 e 5), assegurando ping ok CAM->NVR e confirmando falha (`timeout` ou erro) de outras redes para a VLAN 60.
-- [ ] **Task 4.5:** Validar transporte de tronco simulando troca temporal de IP e Gateway (Teste 6).
+- [x] **Task 4.1:** Validar DHCP fazendo parse do comando `ip dhcp` nos hosts dinâmicos via Netmiko (`infra/testes_aceite.py`, Teste 1: sub-rede, máscara e gateway conferidos contra `plano_rede.json`).
+- [x] **Task 4.2:** Validar conectividade (Teste 2) com o Gateway disparando `ping` e lendo a resposta de sucesso no console (todos os hosts com gateway, inclusive `ADM`).
+- [x] **Task 4.3:** Validar roteamento Inter-VLANs (Teste 3) executando pings cruzados a partir do `PC-LACINA` para LSD, LSI, LIAD e para o `PC-LIAD-SALA` (ligado ao `SW-LSI`, atravessando tronco).
+- [x] **Task 4.4:** Validar isolamento CFTV (Testes 4 e 5), assegurando ping ok CAM->NVR e confirmando falha (`timeout` ou `ICMP unreachable`) das redes de laboratório para a VLAN 60, a partir de `PC-LACINA` e `PC-LSD`.
+- [x] **Task 4.5:** Validar a soberania da VLAN (Teste 6): trocar o IP do `PC-LACINA` para a faixa do LSD **deve** resultar em falha de ping, provando que o isolamento L2 não é burlado por reconfiguração do host; ao final o DHCP é restaurado e revalidado.
 
 ### Milestone 5: Gestão de Mudanças (Day 2 Operations)
 **Objetivo:** Automatizar chamados reais usando abordagem híbrida (API para links/nós + CLI para configuração e desativação L2).
@@ -60,4 +60,4 @@ Implementar 100% da topologia e das configurações da "Atividade Módulo 3" via
 
 1. **Validação de API (Milestone 2):** Executar `infra/setup_lab.py --validate` para comparar, via API v3 do GNS3, os nomes/tipos dos nós com o `project.gns3` embutido em `base_topology/uasc.gns3project` e os 13 enlaces (10 acessos + 3 troncos) com o mapa de `infra/topologia.py`. A execução local validou 14 nós e 13 links, com todos os nós `started` e o `inventario_gns3.json` exportado com 14 consoles.
 2. **Validação de CLI (Milestone 3):** `python -m infra.provisionar --check` lê `show vlan`, `show ipconfig`, `show iproute` e `show ip` e compara com o plano: IDs de VLAN, portas untagged/tagged, SVIs/ipforwarding, ausência de IP/forwarding na VLAN `Cameras`, IP de gerência + rota padrão dos switches de acesso e IP/gateway dos VPCS. O mesmo script já executou `--dry-run` (renderização) e o provisionamento real idempotente, com 4 switches e 10 hosts validados.
-3. **Validação End-to-End (Milestone 4):** A biblioteca `netmiko` ou rotinas via console de gerência farão parse dos resultados de comandos `ping` executados a partir dos VPCS. Um retorno contendo `timeout` ou `unreachable` será tratado como **SUCESSO** no teste de isolamento (CFTV) e como **FALHA** nos testes de comunicação Inter-VLAN.
+3. **Validação End-to-End (Milestone 4):** `python -m infra.testes_aceite` conecta aos VPCS via console (Netmiko), dispara `ip dhcp`/`ping` e faz parse das respostas. Ping respondido exige a linha `84 bytes from <ip>`; ausência de resposta com `timeout`, `host not reachable` ou `ICMP unreachable` caracteriza bloqueio. O bloqueio é **SUCESSO** nos Testes 5 e 6 (isolamento L2/CFTV) e **FALHA** nos Testes 2, 3 e 4 (comunicação esperada). A execução local aprovou os 6 testes, com `--json` disponível para relatório.
