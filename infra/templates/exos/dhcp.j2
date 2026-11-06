@@ -1,0 +1,6 @@
+{#- Escopos DHCP centralizados no SW-LACINA. -#}
+{% for escopo in escopos_dhcp %}
+configure vlan {{ escopo.nome }} dhcp-address-range {{ escopo.inicio }} - {{ escopo.fim }}
+configure vlan {{ escopo.nome }} dhcp-options default-gateway {{ escopo.gateway }}
+enable dhcp ports {{ escopo.portas }} vlan {{ escopo.nome }}
+{% endfor %}

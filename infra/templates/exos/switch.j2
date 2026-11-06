@@ -1,0 +1,13 @@
+{#- Configuração base de um switch EXOS, conforme as normas do STI/UFCG. -#}
+disable clipaging
+
+{% include "exos/vlans.j2" %}
+{% include "exos/portas.j2" %}
+
+{% if papel == "core" %}
+{% include "exos/svi.j2" %}
+{% include "exos/dhcp.j2" %}
+{% else %}
+{% include "exos/gerencia.j2" %}
+{% endif %}
+save configuration

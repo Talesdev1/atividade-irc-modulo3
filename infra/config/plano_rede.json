@@ -1,0 +1,147 @@
+{
+  "vlans": [
+    {"nome": "LSD", "id": 10},
+    {"nome": "LACINA", "id": 20},
+    {"nome": "LSI", "id": 30},
+    {"nome": "LIAD", "id": 40},
+    {"nome": "WiFi", "id": 50},
+    {"nome": "Cameras", "id": 60},
+    {"nome": "Gerencia", "id": 70}
+  ],
+  "redes": {
+    "LSD": {
+      "rede": "172.20.1.128/25",
+      "gateway": "172.20.1.129",
+      "dhcp": true
+    },
+    "LACINA": {
+      "rede": "172.20.1.0/25",
+      "gateway": "172.20.1.1",
+      "dhcp": true
+    },
+    "LSI": {
+      "rede": "172.20.2.0/26",
+      "gateway": "172.20.2.1",
+      "dhcp": true
+    },
+    "LIAD": {
+      "rede": "172.20.2.64/26",
+      "gateway": "172.20.2.65",
+      "dhcp": true
+    },
+    "WiFi": {
+      "rede": "172.20.0.0/24",
+      "gateway": "172.20.0.1",
+      "dhcp": true
+    },
+    "Cameras": {
+      "rede": "172.20.2.128/27",
+      "gateway": null,
+      "dhcp": false
+    },
+    "Gerencia": {
+      "rede": "172.20.2.160/28",
+      "gateway": "172.20.2.161",
+      "dhcp": false
+    }
+  },
+  "switches": {
+    "SW-LACINA": {
+      "papel": "core",
+      "troncos": [
+        {"porta": 22},
+        {"porta": 23},
+        {"porta": 24}
+      ]
+    },
+    "SW-LSD": {
+      "papel": "acesso",
+      "gerencia": "172.20.2.162/28",
+      "troncos": [
+        {"porta": 22}
+      ]
+    },
+    "SW-LSI": {
+      "papel": "acesso",
+      "gerencia": "172.20.2.163/28",
+      "troncos": [
+        {"porta": 23}
+      ]
+    },
+    "SW-LIAD": {
+      "papel": "acesso",
+      "gerencia": "172.20.2.164/28",
+      "troncos": [
+        {"porta": 24}
+      ]
+    }
+  },
+  "hosts": {
+    "PC-LACINA": {
+      "switch": "SW-LACINA",
+      "porta": 1,
+      "vlan": "LACINA",
+      "modo": "dhcp"
+    },
+    "WIFI-1": {
+      "switch": "SW-LACINA",
+      "porta": 2,
+      "vlan": "WiFi",
+      "modo": "dhcp"
+    },
+    "ADM": {
+      "switch": "SW-LACINA",
+      "porta": 3,
+      "vlan": "Gerencia",
+      "modo": "estatico",
+      "ip": "172.20.2.165/28",
+      "gateway": "172.20.2.161"
+    },
+    "PC-LSD": {
+      "switch": "SW-LSD",
+      "porta": 1,
+      "vlan": "LSD",
+      "modo": "dhcp"
+    },
+    "NVR": {
+      "switch": "SW-LSD",
+      "porta": 2,
+      "vlan": "Cameras",
+      "modo": "estatico",
+      "ip": "172.20.2.129/27",
+      "gateway": null
+    },
+    "PC-LSI": {
+      "switch": "SW-LSI",
+      "porta": 1,
+      "vlan": "LSI",
+      "modo": "dhcp"
+    },
+    "PC-LIAD-SALA": {
+      "switch": "SW-LSI",
+      "porta": 2,
+      "vlan": "LIAD",
+      "modo": "dhcp"
+    },
+    "PC-LIAD": {
+      "switch": "SW-LIAD",
+      "porta": 1,
+      "vlan": "LIAD",
+      "modo": "dhcp"
+    },
+    "WIFI-2": {
+      "switch": "SW-LIAD",
+      "porta": 2,
+      "vlan": "WiFi",
+      "modo": "dhcp"
+    },
+    "CAM": {
+      "switch": "SW-LIAD",
+      "porta": 3,
+      "vlan": "Cameras",
+      "modo": "estatico",
+      "ip": "172.20.2.130/27",
+      "gateway": null
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{#- SVIs com gateway e roteamento L3 (somente no switch central). -#}
+{% for item in redes_com_gateway %}
+configure vlan {{ item.nome }} ipaddress {{ item.ip }}
+enable ipforwarding vlan {{ item.nome }}
+{% endfor %}

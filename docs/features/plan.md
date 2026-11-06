@@ -29,11 +29,11 @@ Implementar 100% da topologia e das configurações da "Atividade Módulo 3" via
 
 ### Milestone 3: Provisionamento de Configurações (Netmiko + Jinja2)
 **Objetivo:** Aplicar configurações L2 e L3 nos switches EXOS e IPs nos VPCS, consumindo o inventário dinâmico.
-- [ ] **Task 3.1:** Desenvolver templates Jinja2 baseados nas normas do STI (VLANs, portas Tagged/Untagged, roteamento, DHCP).
-- [ ] **Task 3.2 (Readiness Check):** Implementar rotina de *polling* (Wait-for-Boot) no Netmiko para aguardar o SO EXOS carregar completamente antes de enviar comandos.
-- [ ] **Task 3.3:** Ler o `inventario_gns3.json` e injetar as configurações no `SW-LACINA` (Core/L3) via Netmiko.
-- [ ] **Task 3.4:** Injetar configurações nos switches de acesso (`SW-LSD`, `SW-LSI`, `SW-LIAD`), definindo as rotas padrão de gerência.
-- [ ] **Task 3.5:** Configurar IPs estáticos dos VPCS fixos (ADM, NVR, CAM) e ativar DHCP nos demais (via Netmiko, modo terminal).
+- [x] **Task 3.1:** Desenvolver templates Jinja2 baseados nas normas do STI (VLANs, portas Tagged/Untagged, roteamento, DHCP) em `infra/templates/exos/` e `infra/templates/vpcs/`, alimentados pelo plano declarativo `infra/config/plano_rede.json`.
+- [x] **Task 3.2 (Readiness Check):** Implementar rotina de *polling* (Wait-for-Boot) no Netmiko para aguardar o SO EXOS carregar completamente antes de enviar comandos (`conectar()` em `infra/provisionar.py`, validando `show version`/prompt).
+- [x] **Task 3.3:** Ler o `inventario_gns3.json` e injetar as configurações no `SW-LACINA` (Core/L3) via Netmiko, com *read-before-write* (`show vlan`) e validação por `show vlan`/`show ipconfig`.
+- [x] **Task 3.4:** Injetar configurações nos switches de acesso (`SW-LSD`, `SW-LSI`, `SW-LIAD`), definindo as rotas padrão de gerência e validando-as com `show iproute`.
+- [x] **Task 3.5:** Configurar IPs estáticos dos VPCS fixos (ADM, NVR, CAM) e ativar DHCP nos demais (via Netmiko, modo terminal), validando com `show ip`.
 
 ### Milestone 4: Automação dos Testes de Aceite
 **Objetivo:** Validar os 6 testes exigidos pela UFCG executando comandos automatizados nos VPCS via Telnet.
@@ -52,12 +52,12 @@ Implementar 100% da topologia e das configurações da "Atividade Módulo 3" via
 ---
 
 ### Diretrizes Arquiteturais Críticas
-1. **Fonte da Verdade:** O arquivo `.gns3project` dita os nós da topologia base; o mapa em `infra/topologia.py` dita o cabeamento L1 inicial (acessos e troncos).
+1. **Fonte da Verdade:** O arquivo `.gns3project` dita os nós da topologia base; o mapa em `infra/topologia.py` dita o cabeamento L1 inicial (acessos e troncos); `infra/config/plano_rede.json` dita VLANs, sub-redes, portas de acesso/tronco e endereçamento dos hosts.
 2. **Dinamicidade:** Nenhum script Netmiko deve ter portas Telnet com *hardcode*. O arquivo `inventario_gns3.json` é de leitura obrigatória.
 3. **Robustez CLI:** Todos os scripts de configuração devem prever o tempo de boot dos equipamentos (Readiness Check) para evitar falhas de conexão.
 
 ## 🛠️ Estratégia de Validação
 
 1. **Validação de API (Milestone 2):** Executar `infra/setup_lab.py --validate` para comparar, via API v3 do GNS3, os nomes/tipos dos nós com o `project.gns3` embutido em `base_topology/uasc.gns3project` e os 13 enlaces (10 acessos + 3 troncos) com o mapa de `infra/topologia.py`. A execução local validou 14 nós e 13 links, com todos os nós `started` e o `inventario_gns3.json` exportado com 14 consoles.
-2. **Validação de CLI (Milestone 3):** O script `netmiko` deve capturar a saída de comandos de validação (`show vlan`, `show ipconfig`, `show fdb`) e fazer um *assert* contra os valores esperados.
+2. **Validação de CLI (Milestone 3):** `python -m infra.provisionar --check` lê `show vlan`, `show ipconfig`, `show iproute` e `show ip` e compara com o plano: IDs de VLAN, portas untagged/tagged, SVIs/ipforwarding, ausência de IP/forwarding na VLAN `Cameras`, IP de gerência + rota padrão dos switches de acesso e IP/gateway dos VPCS. O mesmo script já executou `--dry-run` (renderização) e o provisionamento real idempotente, com 4 switches e 10 hosts validados.
 3. **Validação End-to-End (Milestone 4):** A biblioteca `netmiko` ou rotinas via console de gerência farão parse dos resultados de comandos `ping` executados a partir dos VPCS. Um retorno contendo `timeout` ou `unreachable` será tratado como **SUCESSO** no teste de isolamento (CFTV) e como **FALHA** nos testes de comunicação Inter-VLAN.

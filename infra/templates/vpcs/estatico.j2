@@ -1,0 +1,4 @@
+{#- Host estático: câmeras/NVR sem gateway para preservar o isolamento L2. -#}
+{% set linha = "ip " ~ host.ip ~ (" " ~ host.gateway if host.gateway else "") %}
+{{ linha }}
+save

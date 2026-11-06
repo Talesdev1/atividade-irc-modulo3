@@ -1,0 +1,3 @@
+{#- IP de gerência e rota padrão dos switches de acesso. -#}
+configure vlan Gerencia ipaddress {{ gerencia.ip }}
+configure iproute add default {{ gerencia.gateway }}

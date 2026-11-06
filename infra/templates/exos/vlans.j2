@@ -1,0 +1,4 @@
+{#- Cria somente as VLANs ausentes; IDs múltiplos de 10, sem espaços/acentos. -#}
+{% for vlan in vlans_ausentes %}
+create vlan {{ vlan.nome }} tag {{ vlan.id }}
+{% endfor %}
