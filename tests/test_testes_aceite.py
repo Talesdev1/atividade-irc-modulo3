@@ -128,6 +128,57 @@ class HostsNecessariosTest(unittest.TestCase):
         )
 
 
+class MalhaTest(unittest.TestCase):
+    def test_hosts_comunicaveis_inclui_estaticos_roteados(self) -> None:
+        self.assertEqual(
+            testes_aceite.hosts_comunicaveis(PLANO),
+            [
+                "PC-LACINA",
+                "WIFI-1",
+                "ADM",
+                "PC-LSD",
+                "PC-LSI",
+                "PC-LIAD-SALA",
+                "PC-LIAD",
+                "WIFI-2",
+            ],
+        )
+
+    def test_hosts_comunicaveis_exclui_cftv(self) -> None:
+        comunicaveis = testes_aceite.hosts_comunicaveis(PLANO)
+        self.assertNotIn("CAM", comunicaveis)
+        self.assertNotIn("NVR", comunicaveis)
+
+    def test_malha_cobre_todos_os_pares_sem_repetir(self) -> None:
+        pares = testes_aceite.pares_completos(PLANO)
+        hosts = testes_aceite.hosts_comunicaveis(PLANO)
+        self.assertEqual(len(pares), len(hosts) * (len(hosts) - 1) // 2)
+        self.assertEqual(len(set(pares)), len(pares))
+        for origem, destino in pares:
+            self.assertNotEqual(origem, destino)
+            self.assertNotIn((destino, origem), pares)
+
+    def test_malha_inclui_par_intra_vlan_entre_switches(self) -> None:
+        pares = testes_aceite.pares_completos(PLANO)
+        self.assertIn(("PC-LIAD-SALA", "PC-LIAD"), pares)
+
+    def test_pares_inter_vlan_e_subconjunto_da_malha(self) -> None:
+        malha = set(testes_aceite.pares_completos(PLANO))
+        inter = testes_aceite.pares_inter_vlan(PLANO)
+        self.assertTrue(inter)
+        self.assertTrue(set(inter).issubset(malha))
+        for origem, destino in inter:
+            self.assertNotEqual(
+                PLANO["hosts"][origem]["vlan"], PLANO["hosts"][destino]["vlan"]
+            )
+
+    def test_teste3_exige_todos_os_hosts_da_malha(self) -> None:
+        self.assertEqual(
+            testes_aceite.hosts_necessarios([3], PLANO),
+            sorted(testes_aceite.hosts_comunicaveis(PLANO)),
+        )
+
+
 class Teste6Test(unittest.TestCase):
     def test_ip_temporario_pertence_a_outra_sub_rede(self) -> None:
         temporario = ipaddress.ip_interface(testes_aceite.IP_TESTE6)

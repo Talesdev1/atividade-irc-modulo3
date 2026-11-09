@@ -94,7 +94,7 @@ Rodam via Telnet nos consoles dos VPCS, com parsing de texto (ADR 004). Exit cod
 | :-: | --- | --- |
 | 1 | Endereçamento via DHCP | Cada host dinâmico obtém IP dentro da sub-rede da sua VLAN, com o gateway correto |
 | 2 | Conectividade com o gateway | Todos os hosts com gateway pingam o gateway da própria VLAN |
-| 3 | Roteamento inter-VLAN | `PC-LACINA` alcança hosts de outras VLANs (LSD, LSI, LIAD, `PC-LIAD-SALA`) |
+| 3 | Conectividade entre todos os nós | Malha completa entre os 8 hosts roteáveis (28 pares: inter-VLAN + `PC-LIAD` ↔ `PC-LIAD-SALA` pela tronco); `CAM`/`NVR` ficam de fora por isolamento |
 | 4 | CFTV: `CAM` → `NVR` | Comunicação L2 dentro da VLAN `Cameras` |
 | 5 | Isolamento do CFTV | Nenhum host de laboratório alcança `CAM`/`NVR` (**bloqueio = sucesso**) |
 | 6 | Soberania da VLAN L2 | Trocar o IP do `PC-LACINA` para a faixa do LSD **deve** falhar no ping; o host é restaurado via DHCP ao final (**bloqueio = sucesso**) |

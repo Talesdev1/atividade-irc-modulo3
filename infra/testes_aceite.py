@@ -7,7 +7,8 @@ Os testes consomem o inventário dinâmico gerado pelo Milestone 2
 
 1. DHCP: ``ip dhcp`` e conferência de sub-rede, máscara e gateway.
 2. Conectividade: cada host alcança o gateway da sua VLAN.
-3. Roteamento inter-VLAN a partir do ``PC-LACINA``.
+3. Malha completa: todos os hosts roteáveis se alcançam entre si (pares
+   inter-VLAN e intra-VLAN), excluindo a VLAN ``Cameras``.
 4. CFTV: ``CAM`` alcança o ``NVR`` em Camada 2 (VLAN 60, sem gateway).
 5. Isolamento: nenhum laboratório alcança ``CAM``/``NVR``.
 6. Soberania da VLAN: trocar o IP do ``PC-LACINA`` para a faixa do LSD não
@@ -56,14 +57,13 @@ PLANO_PADRAO = RAIZ / "infra" / "config" / "plano_rede.json"
 IP_TESTE6 = "172.20.1.250/25"
 
 ORIGEM_INTER_VLAN = "PC-LACINA"
-ALVOS_INTER_VLAN = ("PC-LSD", "PC-LSI", "PC-LIAD", "PC-LIAD-SALA")
 ORIGENS_ISOLAMENTO = ("PC-LACINA", "PC-LSD")
 HOSTS_CFTV = ("CAM", "NVR")
 
 TITULOS = {
     1: "Endereçamento via DHCP",
     2: "Conectividade com o gateway",
-    3: "Roteamento inter-VLAN",
+    3: "Conectividade entre todos os nós",
     4: "CFTV: CAM -> NVR",
     5: "Isolamento da rede de câmeras",
     6: "Soberania da VLAN L2 (Teste 6)",
@@ -146,6 +146,44 @@ def gateway_esperado(plano: dict, host: dict) -> str | None:
     return plano["redes"][host["vlan"]].get("gateway")
 
 
+def hosts_comunicaveis(plano: dict) -> list[str]:
+    """Hosts que participam da malha de comunicação: todos os que têm gateway.
+
+    A VLAN ``Cameras`` não possui gateway por projeto (isolamento CFTV), então
+    ``CAM``/``NVR`` ficam de fora automaticamente. Inclui os hosts estáticos
+    roteados (ex.: ``ADM`` na VLAN Gerencia) além dos dinâmicos.
+    """
+    return [
+        nome
+        for nome, host in plano["hosts"].items()
+        if gateway_esperado(plano, host) is not None
+    ]
+
+
+def pares_completos(plano: dict) -> list[tuple[str, str]]:
+    """Todos os pares (origem, destino) da malha, sem repetir a ordem inversa.
+
+    Um ICMP echo bem-sucedido exige ida e volta, então cada par é validado
+    uma única vez. Pares na mesma VLAN (ex.: LIAD entre switches via tronco)
+    também entram na malha.
+    """
+    hosts = hosts_comunicaveis(plano)
+    return [
+        (hosts[i], hosts[j])
+        for i in range(len(hosts))
+        for j in range(i + 1, len(hosts))
+    ]
+
+
+def pares_inter_vlan(plano: dict) -> list[tuple[str, str]]:
+    """Subconjunto de ``pares_completos`` com hosts em VLANs diferentes."""
+    return [
+        (origem, destino)
+        for origem, destino in pares_completos(plano)
+        if plano["hosts"][origem]["vlan"] != plano["hosts"][destino]["vlan"]
+    ]
+
+
 def hosts_necessarios(testes: list[int], plano: dict) -> list[str]:
     """Nós que precisam estar no ar para executar os testes escolhidos."""
     necessarios: set[str] = set()
@@ -163,8 +201,7 @@ def hosts_necessarios(testes: list[int], plano: dict) -> list[str]:
                 if gateway_esperado(plano, host)
             }
         elif numero == 3:
-            necessarios.add(ORIGEM_INTER_VLAN)
-            necessarios |= set(ALVOS_INTER_VLAN)
+            necessarios |= set(hosts_comunicaveis(plano))
         elif numero == 4:
             necessarios |= set(HOSTS_CFTV)
         elif numero == 5:
@@ -304,18 +341,32 @@ class Contexto:
         return self.plano["hosts"][nome]["ip"].split("/")[0]
 
     def ip_atual(self, nome: str) -> str:
-        """IP vigente do host, lendo o console se ainda não foi coletado."""
+        """IP vigente do host, lendo o console se ainda não foi coletado.
+
+        Hosts dinâmicos só são aceitos se o IP estiver dentro da rede da VLAN
+        planejada; caso contrário o DHCP é reexecutado (importante quando o
+        Teste 3 roda sozinho, sem o Teste 1 antes).
+        """
         if nome in self.ips:
             return self.ips[nome]
         host = self.plano["hosts"][nome]
         if host["modo"] == "estatico":
             self.ips[nome] = host["ip"].split("/")[0]
             return self.ips[nome]
+        rede = ipaddress.ip_network(
+            self.plano["redes"][host["vlan"]]["rede"], strict=True
+        )
         conexao = self.sessoes.vpcs(nome)
         ip, _ = ler_ip_vpcs(conexao)
-        if not ip or ip == "0.0.0.0/0":
+        valido = False
+        if ip and ip != "0.0.0.0/0":
+            try:
+                valido = ipaddress.ip_interface(ip).network == rede
+            except ValueError:
+                valido = False
+        if not valido:
             self.sessoes.comando(nome, "ip dhcp")
-        ip, _ = aguardar_dhcp(conexao)
+            ip, _ = aguardar_dhcp(conexao)
         self.ips[nome] = ip.split("/")[0]
         return self.ips[nome]
 
@@ -369,9 +420,23 @@ def teste_2_gateway(ctx: Contexto) -> Resultado:
     return _resultado(2, ctx)
 
 
-def teste_3_inter_vlan(ctx: Contexto) -> Resultado:
-    for alvo in ALVOS_INTER_VLAN:
-        ctx.ping_esperado(ORIGEM_INTER_VLAN, ctx.ip_atual(alvo))
+def teste_3_malha_completa(ctx: Contexto) -> Resultado:
+    """Todos os hosts roteáveis devem se alcançar (malha completa).
+
+    Inclui pares inter-VLAN (roteamento no ``SW-LACINA``) e pares intra-VLAN
+    que atravessam tronco (``PC-LIAD`` <-> ``PC-LIAD-SALA``). ``CAM``/``NVR``
+    ficam de fora porque a VLAN ``Cameras`` é isolada e não tem gateway.
+    """
+    pares = pares_completos(ctx.plano)
+    if not pares:
+        raise ValueError("nenhum par de hosts comunicáveis encontrado no plano")
+
+    # Garante endereçamento válido em todos os nós antes de disparar os pings.
+    for nome in hosts_comunicaveis(ctx.plano):
+        ctx.ip_atual(nome)
+
+    for origem, destino in pares:
+        ctx.ping_esperado(origem, ctx.ip_atual(destino))
     return _resultado(3, ctx)
 
 
@@ -431,7 +496,7 @@ def teste_6_soberania_vlan(ctx: Contexto) -> Resultado:
 TESTES = {
     1: teste_1_dhcp,
     2: teste_2_gateway,
-    3: teste_3_inter_vlan,
+    3: teste_3_malha_completa,
     4: teste_4_cftv,
     5: teste_5_isolamento,
     6: teste_6_soberania_vlan,

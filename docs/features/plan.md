@@ -39,7 +39,7 @@ Implementar 100% da topologia e das configurações da "Atividade Módulo 3" via
 **Objetivo:** Validar os 6 testes exigidos pela UFCG executando comandos automatizados nos VPCS via Telnet.
 - [x] **Task 4.1:** Validar DHCP fazendo parse do comando `ip dhcp` nos hosts dinâmicos via Netmiko (`infra/testes_aceite.py`, Teste 1: sub-rede, máscara e gateway conferidos contra `plano_rede.json`).
 - [x] **Task 4.2:** Validar conectividade (Teste 2) com o Gateway disparando `ping` e lendo a resposta de sucesso no console (todos os hosts com gateway, inclusive `ADM`).
-- [x] **Task 4.3:** Validar roteamento Inter-VLANs (Teste 3) executando pings cruzados a partir do `PC-LACINA` para LSD, LSI, LIAD e para o `PC-LIAD-SALA` (ligado ao `SW-LSI`, atravessando tronco).
+- [x] **Task 4.3:** Validar a conectividade de todos os nós entre si (Teste 3) executando pings em malha completa entre os 8 hosts com gateway (28 pares: inter-VLANs via `SW-LACINA` + par intra-VLAN `PC-LIAD` ↔ `PC-LIAD-SALA` atravessando tronco), excluindo `CAM`/`NVR` por isolamento.
 - [x] **Task 4.4:** Validar isolamento CFTV (Testes 4 e 5), assegurando ping ok CAM->NVR e confirmando falha (`timeout` ou `ICMP unreachable`) das redes de laboratório para a VLAN 60, a partir de `PC-LACINA` e `PC-LSD`.
 - [x] **Task 4.5:** Validar a soberania da VLAN (Teste 6): trocar o IP do `PC-LACINA` para a faixa do LSD **deve** resultar em falha de ping, provando que o isolamento L2 não é burlado por reconfiguração do host; ao final o DHCP é restaurado e revalidado.
 
