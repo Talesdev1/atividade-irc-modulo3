@@ -12,8 +12,10 @@ infra/
   setup_lab.py          Abre o projeto, inicia os nós e exporta o inventário
   provisionar.py        Configura switches EXOS e VPCS via Netmiko + Jinja2
   testes_aceite.py      Executa os 6 testes de aceite nos consoles dos VPCS
+  mudancas.py           Executa os chamados de Day 2 (Milestone 5) via API + Netmiko
   topologia.py          Mapa L1 (enlaces/portas) usado nas validações
   config/plano_rede.json  Plano declarativo (fonte da verdade: VLANs, redes, hosts)
+  config/plano_mudancas.json  Plano declarativo dos três chamados de Day 2
   templates/            Templates Jinja2 (exos/ e vpcs/)
 setup_lab.py            Atalho para infra/setup_lab.py
 inventario_gns3.json    Inventário de consoles (gerado, não editar à mão)
@@ -56,7 +58,15 @@ python -m infra.provisionar --check
 
 # 4. Rodar os testes de aceite
 python -m infra.testes_aceite
+
+# 5. (Opcional, Day 2) Executar os chamados de gestão de mudanças
+python -m infra.mudancas chamado1
+python -m infra.mudancas chamado2
+python -m infra.mudancas chamado3
+python -m infra.mudancas --check todos
 ```
+
+> ⚠️ O passo 5 **altera a topologia** (cria nó/cabo, desabilita a porta 24 de `SW-LACINA`/`SW-LIAD`, cria tronco de contingência e renomeia/move o `PC-LIAD-SALA`). Rode-o apenas depois de concluir os passos 1–4, pois o `testes_aceite` usa a topologia original. Os chamados são **sequenciais e idempotentes**: `chamado2` depende do `chamado1`, e `chamado3` do `chamado2`.
 
 Se o projeto já estiver aberto e você só quer subir os nós:
 
@@ -80,7 +90,12 @@ python setup_lab.py --no-links
 | `python -m infra.testes_aceite --only 1,2` | Roda apenas os testes escolhidos |
 | `python -m infra.testes_aceite --json /tmp/aceite.json` | Grava o relatório da bateria em JSON |
 | `python -m infra.testes_aceite --verbose` | Mostra a saída bruta dos pings que falharem |
-| `python -m unittest discover -s tests -v` | Testes unitários (offline, 31 testes) |
+| `python -m infra.mudancas chamado1` | Cria `PC-LACINA-SALA` no `SW-LIAD` porta 4 e o configura via DHCP em `LACINA` |
+| `python -m infra.mudancas chamado2` | Simula o rompimento do tronco `SW-LACINA`↔`SW-LIAD` e cria o desvio via `SW-LSI` |
+| `python -m infra.mudancas chamado3` | Renomeia `PC-LIAD-SALA`→`PC-LSI-SALA`, move para `LSI` e remove a VLAN `LIAD` do `SW-LSI` |
+| `python -m infra.mudancas todos` | Executa os três chamados na ordem sequencial (interrompe no primeiro erro) |
+| `python -m infra.mudancas --check todos` | Só valida o estado final dos três chamados |
+| `python -m unittest discover -s tests -v` | Testes unitários (offline, 66 testes) |
 
 ### Ordem de aplicação
 
@@ -100,6 +115,18 @@ Rodam via Telnet nos consoles dos VPCS, com parsing de texto (ADR 004). Exit cod
 | 6 | Soberania da VLAN L2 | Trocar o IP do `PC-LACINA` para a faixa do LSD **deve** falhar no ping; o host é restaurado via DHCP ao final (**bloqueio = sucesso**) |
 
 > ⚠️ O Teste 6 altera temporariamente o IP do `PC-LACINA`. Se você interromper com `Ctrl+C` no meio, pode sobrar IP manual — rode `ip dhcp` no console desse VPCS.
+
+## Gestão de mudanças (Day 2)
+
+O `infra.mudancas` encena os três chamados operacionais do Milestone 5 em ordem sequencial, usando a abordagem híbrida: **API do GNS3** (`gns3fy`) para criar/renomear nós e cabos, e **Netmiko** para configurar EXOS e VPCS. Todos os valores vêm de `infra/config/plano_mudancas.json`; as portas de console vêm de `inventario_gns3.json`, que é regravado após criar/renomear nós.
+
+| Chamado | O que muda no laboratório |
+| --- | --- |
+| 1 | Cria o VPCS `PC-LACINA-SALA`, liga em `SW-LIAD` porta 4 e deixa a porta `untagged` na VLAN `LACINA` (DHCP). |
+| 2 | Desabilita a porta 24 de `SW-LACINA` e de `SW-LIAD` (cabo rompido), liga o cabo de contingência `SW-LSI` porta 22 ↔ `SW-LIAD` porta 22 e marca todas as VLANs como `tagged`; valida `PC-LIAD`→gateway e `CAM`→`NVR` pelo desvio. |
+| 3 | Renomeia `PC-LIAD-SALA`→`PC-LSI-SALA`, muda a porta 2 do `SW-LSI` para a VLAN `LSI` e remove a VLAN `LIAD` residual do `SW-LSI`; valida o DHCP em `LSI` e o ping ao `PC-LSI`. |
+
+Cada chamado valida o próprio resultado ao final. `--check` compara o estado observado com o plano sem alterar nada. O Chamado 3 emite um aviso: enquanto o enlace `SW-LACINA`↔`SW-LIAD` estiver desabilitado, o `PC-LIAD` perde conectividade L3 porque a VLAN `LIAD` deixa de ser transportada pelo `SW-LSI`.
 
 ## Testes unitários
 

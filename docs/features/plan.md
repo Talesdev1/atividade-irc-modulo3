@@ -45,9 +45,9 @@ Implementar 100% da topologia e das configurações da "Atividade Módulo 3" via
 
 ### Milestone 5: Gestão de Mudanças (Day 2 Operations)
 **Objetivo:** Automatizar chamados reais usando abordagem híbrida (API para links/nós + CLI para configuração e desativação L2).
-- [ ] **Task 5.1 (Chamado 1):** Usar `gns3fy` para adicionar o nó VPCS `PC-LACINA-SALA` e linká-lo à porta 4 do `SW-LIAD`. Usar Netmiko para associar a porta à VLAN LACINA no switch.
-- [ ] **Task 5.2 (Chamado 2):** Simular rompimento do cabo LACINA-LIAD via CLI (Netmiko) enviando `disable port 24` nos dois switches. Em seguida, usar API para ligar o novo cabo de contingência entre `SW-LSI` e `SW-LIAD` e Netmiko para reconfigurar os troncos.
-- [ ] **Task 5.3 (Chamado 3):** Migrar virtualmente o PC-LIAD-SALA, reconfigurando no Netmiko a porta de acesso do `SW-LSI` e removendo a VLAN `LIAD` residual.
+- [x] **Task 5.1 (Chamado 1):** Usar `gns3fy` para adicionar o nó VPCS `PC-LACINA-SALA` e linká-lo à porta 4 do `SW-LIAD`. Usar Netmiko para associar a porta à VLAN LACINA no switch.
+- [x] **Task 5.2 (Chamado 2):** Simular rompimento do cabo LACINA-LIAD via CLI (Netmiko) enviando `disable port 24` nos dois switches. Em seguida, usar API para ligar o novo cabo de contingência entre `SW-LSI` e `SW-LIAD` e Netmiko para reconfigurar os troncos.
+- [x] **Task 5.3 (Chamado 3):** Migrar virtualmente o PC-LIAD-SALA, reconfigurando no Netmiko a porta de acesso do `SW-LSI` e removendo a VLAN `LIAD` residual.
 
 ---
 
@@ -61,3 +61,4 @@ Implementar 100% da topologia e das configurações da "Atividade Módulo 3" via
 1. **Validação de API (Milestone 2):** Executar `infra/setup_lab.py --validate` para comparar, via API v3 do GNS3, os nomes/tipos dos nós com o `project.gns3` embutido em `base_topology/uasc.gns3project` e os 13 enlaces (10 acessos + 3 troncos) com o mapa de `infra/topologia.py`. A execução local validou 14 nós e 13 links, com todos os nós `started` e o `inventario_gns3.json` exportado com 14 consoles.
 2. **Validação de CLI (Milestone 3):** `python -m infra.provisionar --check` lê `show vlan`, `show ipconfig`, `show iproute` e `show ip` e compara com o plano: IDs de VLAN, portas untagged/tagged, SVIs/ipforwarding, ausência de IP/forwarding na VLAN `Cameras`, IP de gerência + rota padrão dos switches de acesso e IP/gateway dos VPCS. O mesmo script já executou `--dry-run` (renderização) e o provisionamento real idempotente, com 4 switches e 10 hosts validados.
 3. **Validação End-to-End (Milestone 4):** `python -m infra.testes_aceite` conecta aos VPCS via console (Netmiko), dispara `ip dhcp`/`ping` e faz parse das respostas. Ping respondido exige a linha `84 bytes from <ip>`; ausência de resposta com `timeout`, `host not reachable` ou `ICMP unreachable` caracteriza bloqueio. O bloqueio é **SUCESSO** nos Testes 5 e 6 (isolamento L2/CFTV) e **FALHA** nos Testes 2, 3 e 4 (comunicação esperada). A execução local aprovou os 6 testes, com `--json` disponível para relatório.
+4. **Validação de Mudanças (Milestone 5):** `python -m infra.mudancas --check todos` valida, sem alterar o laboratório, o nó/cabo/DHCP do Chamado 1, as duas pontas desabilitadas + tronco de contingência do Chamado 2 e o nó renomeado/VLAN `LIAD` ausente do `SW-LSI` no Chamado 3. A execução local aplicou os três chamados na ordem e o `--check todos` final passou; o Chamado 2 também foi validado funcionalmente com `PC-LIAD` → gateway `172.20.2.65` e `CAM` → `NVR` pelo desvio via `SW-LSI`.

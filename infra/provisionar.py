@@ -853,10 +853,10 @@ def conectar(
                 if "ExtremeXOS" not in versao:
                     raise ProntidaoError("EXOS ainda não respondeu a 'show version'")
             else:
-                if "VPCS" not in prompt:
+                if not prompt.strip().endswith(">"):
                     conn.write_channel("\r\n")
                     prompt = conn.find_prompt()
-                if "VPCS" not in prompt:
+                if not prompt.strip().endswith(">"):
                     raise ProntidaoError(f"prompt do VPCS inesperado: {prompt!r}")
                 conn.send_command("show ip", read_timeout=30)
             return conn

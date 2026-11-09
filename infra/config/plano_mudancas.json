@@ -1,0 +1,34 @@
+{
+  "chamado1": {
+    "host": {
+      "nome": "PC-LACINA-SALA",
+      "switch": "SW-LIAD",
+      "porta": 4,
+      "vlan": "LACINA",
+      "modo": "dhcp"
+    }
+  },
+  "chamado2": {
+    "enlace_rompido": {
+      "no_a": "SW-LACINA",
+      "porta_a": 24,
+      "no_b": "SW-LIAD",
+      "porta_b": 24
+    },
+    "novo_tronco": {
+      "no_a": "SW-LSI",
+      "porta_a": 22,
+      "no_b": "SW-LIAD",
+      "porta_b": 22
+    }
+  },
+  "chamado3": {
+    "host_atual": "PC-LIAD-SALA",
+    "novo_nome": "PC-LSI-SALA",
+    "switch": "SW-LSI",
+    "porta": 2,
+    "vlan_origem": "LIAD",
+    "vlan_destino": "LSI",
+    "vlan_residual": "LIAD"
+  }
+}
