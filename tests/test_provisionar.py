@@ -6,11 +6,44 @@ import copy
 import json
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from infra import provisionar
 
 RAIZ = Path(__file__).resolve().parents[1]
 PLANO = json.loads((RAIZ / "infra" / "config" / "plano_rede.json").read_text())
+
+
+class FakeRelogio:
+    """Substitui o módulo 'time' dentro de provisionar (relógio discreto)."""
+
+    def __init__(self) -> None:
+        self.agora = 1000.0
+
+    def monotonic(self) -> float:
+        return self.agora
+
+    def sleep(self, segundos: float) -> None:
+        self.agora += segundos
+
+
+class ConexaoVpcsFake:
+    """Console VPCS simulado: 'show ip' scriptado e comandos registrados."""
+
+    def __init__(self, respostas_show_ip: list[str]) -> None:
+        self.respostas = list(respostas_show_ip)
+        self.comandos_enviados: list[str] = []
+
+    def send_command(self, comando: str, read_timeout: int = 60) -> str:
+        if comando != "show ip":
+            return ""
+        if self.respostas:
+            self.ultima = self.respostas.pop(0)
+        return self.ultima
+
+    def send_command_timing(self, comando: str, **kwargs) -> str:
+        self.comandos_enviados.append(comando)
+        return ""
 
 
 class PlanoTest(unittest.TestCase):
@@ -146,6 +179,45 @@ class ReadBeforeWriteTest(unittest.TestCase):
         self.assertEqual(escopos["WiFi"]["portas"], "2,22-24")
         self.assertNotIn("Cameras", escopos)
         self.assertNotIn("Gerencia", escopos)
+
+
+class AguardarDhcpTest(unittest.TestCase):
+    """Espera do DHCP com reenvio periódico de 'ip dhcp' e relógio falso."""
+
+    def setUp(self) -> None:
+        self.relogio = FakeRelogio()
+        patcher = mock.patch("infra.provisionar.time", self.relogio)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _sem_ip(self) -> str:
+        return "IP/MASK     : 0.0.0.0/0\nGATEWAY     : 0.0.0.0\n"
+
+    def _com_ip(self) -> str:
+        return "IP/MASK     : 172.20.2.10/26\nGATEWAY     : 172.20.2.1\n"
+
+    def test_obtem_ip_sem_reenvio(self) -> None:
+        conn = ConexaoVpcsFake([self._sem_ip(), self._com_ip()])
+        ip, gateway = provisionar.aguardar_dhcp(conn)
+        self.assertEqual(ip, "172.20.2.10/26")
+        self.assertEqual(gateway, "172.20.2.1")
+        self.assertEqual(conn.comandos_enviados, [])
+
+    def test_reenvia_ip_dhcp_enquanto_espera(self) -> None:
+        # 12 leituras sem IP (t=0,2,...,20) e resposta válida em t=22:
+        # 'ip dhcp' deve ser reenviado em t=10 e t=20.
+        conn = ConexaoVpcsFake([self._sem_ip()] * 11 + [self._com_ip()])
+        ip, gateway = provisionar.aguardar_dhcp(conn)
+        self.assertEqual(ip, "172.20.2.10/26")
+        self.assertEqual(conn.comandos_enviados, ["ip dhcp", "ip dhcp"])
+
+    def test_estoura_timeout_reenviando(self) -> None:
+        conn = ConexaoVpcsFake([self._sem_ip()])
+        with self.assertRaises(provisionar.ValidacaoError) as contexto:
+            provisionar.aguardar_dhcp(conn, timeout=30)
+        self.assertIn("30s", str(contexto.exception))
+        self.assertIn("0.0.0.0/0", str(contexto.exception))
+        self.assertEqual(conn.comandos_enviados, ["ip dhcp", "ip dhcp"])
 
 
 if __name__ == "__main__":

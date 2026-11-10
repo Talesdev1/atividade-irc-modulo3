@@ -129,6 +129,12 @@ def parse_args() -> argparse.Namespace:
         default=5.0,
         help="Intervalo entre tentativas de conexão, em segundos (padrão: 5)",
     )
+    parser.add_argument(
+        "--dhcp-timeout",
+        type=int,
+        default=90,
+        help="Espera máxima, em segundos, pelo DHCP de cada host (padrão: 90)",
+    )
     return parser.parse_args()
 
 
@@ -1000,25 +1006,47 @@ def ler_ip_vpcs(conn) -> tuple[str | None, str | None]:
     return ip, gateway
 
 
+#: Intervalo, em segundos, entre reenvios do comando 'ip dhcp' durante a
+#: espera. O VPCS abandona a solicitação DHCP sozinho após poucas
+#: tentativas, portanto apenas fazer polling de 'show ip' nunca reinicia a
+#: negociação — o comando precisa ser reenviado pelo chamador.
+INTERVALO_REENVIO_DHCP = 10
+
+
 def aguardar_dhcp(conn, timeout: int = 45):
+    """Espera o VPCS obter endereço via DHCP, reenviando 'ip dhcp' se preciso.
+
+    O VPCS desiste da solicitação DHCP sozinho (por exemplo quando as
+    primeiras tentativas caem na janela de convergência de boot/STP) e
+    permanece em 0.0.0.0/0. Enquanto nenhum IP chega, o comando é
+    reenviado a cada INTERVALO_REENVIO_DHCP segundos; o chamador já envia
+    o primeiro 'ip dhcp' antes de chamar esta função.
+    """
     limite = time.monotonic() + timeout
+    reenvio = time.monotonic() + INTERVALO_REENVIO_DHCP
     while True:
         ip, gateway = ler_ip_vpcs(conn)
         if ip and ip != "0.0.0.0/0":
             return ip, gateway
-        if time.monotonic() >= limite:
+        agora = time.monotonic()
+        if agora >= limite:
             raise ValidacaoError(
                 f"host não obteve IP via DHCP em {timeout}s (show ip: {ip!r})"
             )
+        if agora >= reenvio:
+            aplicar_vpcs(conn, ["ip dhcp"])
+            reenvio = agora + INTERVALO_REENVIO_DHCP
         time.sleep(2)
 
 
-def validar_vpcs(conn, nome: str, plano: dict, host: dict) -> None:
+def validar_vpcs(
+    conn, nome: str, plano: dict, host: dict, dhcp_timeout: int = 45
+) -> None:
     if host["modo"] == "dhcp":
         rede = ipaddress.ip_network(
             plano["redes"][host["vlan"]]["rede"], strict=True
         )
-        ip, gateway = aguardar_dhcp(conn)
+        ip, gateway = aguardar_dhcp(conn, timeout=dhcp_timeout)
         interface = ipaddress.ip_interface(ip)
         if interface.network != rede:
             raise ValidacaoError(
@@ -1135,7 +1163,7 @@ def processar_host(
     try:
         host = plano["hosts"][nome]
         if somente_validar:
-            validar_vpcs(conn, nome, plano, host)
+            validar_vpcs(conn, nome, plano, host, args.dhcp_timeout)
             print("  OK: host validado.")
             return
 
@@ -1145,7 +1173,7 @@ def processar_host(
             for comando in comandos:
                 print(f"  {comando}")
         aplicar_vpcs(conn, comandos)
-        validar_vpcs(conn, nome, plano, host)
+        validar_vpcs(conn, nome, plano, host, args.dhcp_timeout)
         print("  OK: host configurado e validado.")
     finally:
         conn.disconnect()

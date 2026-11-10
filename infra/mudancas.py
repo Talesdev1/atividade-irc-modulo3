@@ -636,7 +636,7 @@ def configurar_host_dhcp(ctx: Contexto, nome: str, vlan: str) -> str:
     )
     try:
         aplicar_vpcs(conn, ["ip dhcp"])
-        ip, gateway = aguardar_dhcp(conn)
+        ip, gateway = aguardar_dhcp(conn, timeout=ctx.args.dhcp_timeout)
         aplicar_vpcs(conn, ["save"])
     finally:
         conn.disconnect()
@@ -978,6 +978,12 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=5.0,
         help="Intervalo entre tentativas de conexão, em segundos (padrão: 5)",
+    )
+    parser.add_argument(
+        "--dhcp-timeout",
+        type=int,
+        default=90,
+        help="Espera máxima, em segundos, pelo DHCP de cada host (padrão: 90)",
     )
     return parser.parse_args()
 

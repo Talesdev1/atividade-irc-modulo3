@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import ipaddress
 import json
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from infra import testes_aceite
 
@@ -191,6 +194,153 @@ class Teste6Test(unittest.TestCase):
         temporario = ipaddress.ip_interface(testes_aceite.IP_TESTE6)
         gateway = ipaddress.ip_address(PLANO["redes"]["LSD"]["gateway"])
         self.assertIn(gateway, temporario.network)
+
+
+class SessoesFake:
+    """Sessões de console simuladas: registra comandos e pings.
+
+    ``vpcs()`` devolve o próprio nome do host como token, o que permite aos
+    stubs de ``aguardar_dhcp``/``ler_ip_vpcs`` saber de qual host se trata.
+    """
+
+    def __init__(self, resposta_ping: testes_aceite.RespostaPing | None = None):
+        self.comandos: list[tuple[str, str]] = []
+        self.resposta_ping = resposta_ping or testes_aceite.RespostaPing(
+            True, "resposta ICMP recebida"
+        )
+
+    def vpcs(self, nome: str) -> str:
+        return nome
+
+    def comando(self, nome: str, comando: str, read_timeout: int = 120) -> str:
+        self.comandos.append((nome, comando))
+        return ""
+
+    def ping(self, nome: str, destino: str) -> testes_aceite.RespostaPing:
+        self.comandos.append((nome, f"ping {destino}"))
+        return self.resposta_ping
+
+
+def _args_sessoes(**extra) -> argparse.Namespace:
+    return _args(
+        dhcp_timeout=90,
+        ping_timeout=120,
+        contagem=3,
+        verbose=False,
+        **extra,
+    )
+
+
+def _ip_da_vlan(plano: dict, vlan: str) -> str:
+    rede = ipaddress.ip_network(plano["redes"][vlan]["rede"])
+    return f"{rede.network_address + 10}/{rede.prefixlen}"
+
+
+class Teste1DhcpTest(unittest.TestCase):
+    """Falha de DHCP em um host não pode abortar os demais hosts."""
+
+    def _executar(self, sem_ip: set[str]) -> tuple[testes_aceite.Resultado, SessoesFake]:
+        sessoes = SessoesFake()
+        ctx = testes_aceite.Contexto(PLANO, sessoes, _args_sessoes())
+        self._ctx = ctx
+
+        def aguardar_stub(conn, timeout=45):
+            nome = conn
+            vlan = PLANO["hosts"][nome]["vlan"]
+            if nome in sem_ip:
+                raise RuntimeError(
+                    f"host não obteve IP via DHCP em {timeout}s "
+                    "(show ip: '0.0.0.0/0')"
+                )
+            gateway = str(PLANO["redes"][vlan]["gateway"])
+            return _ip_da_vlan(PLANO, vlan), gateway
+
+        with (
+            mock.patch.object(testes_aceite, "aguardar_dhcp", aguardar_stub),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            resultado = testes_aceite.teste_1_dhcp(ctx)
+        return resultado, sessoes
+
+    def test_falha_em_um_host_nao_interrompe_os_demais(self) -> None:
+        resultado, sessoes = self._executar({"PC-LSD"})
+        self.assertFalse(resultado.ok)
+        self.assertTrue(
+            any("PC-LSD não obteve IP" in falha for falha in resultado.falhas)
+        )
+        # Todos os hosts dinâmicos foram tentados, mesmo após a falha.
+        dhcp_hosts = [
+            nome
+            for nome, host in PLANO["hosts"].items()
+            if host["modo"] == "dhcp"
+        ]
+        disparados = [nome for nome, cmd in sessoes.comandos if cmd == "ip dhcp"]
+        self.assertEqual(sorted(disparados), sorted(dhcp_hosts))
+        # Hosts que obtiveram IP seguem registrados no contexto.
+        self.assertIn("PC-LACINA", self._ctx.ips)
+        self.assertNotIn("PC-LSD", self._ctx.ips)
+
+    def test_todos_com_ip_aprovam_o_teste(self) -> None:
+        resultado, _ = self._executar(set())
+        self.assertTrue(resultado.ok)
+        self.assertEqual(resultado.falhas, [])
+
+
+class Teste2GatewayTest(unittest.TestCase):
+    """Sem IP válido o Teste 2 registra causa clara em vez de ping cego."""
+
+    def _executar(self, sem_ip: set[str]) -> tuple[testes_aceite.Resultado, SessoesFake]:
+        sessoes = SessoesFake()
+        ctx = testes_aceite.Contexto(PLANO, sessoes, _args_sessoes())
+
+        def ler_stub(conn):
+            nome = conn
+            vlan = PLANO["hosts"][nome]["vlan"]
+            if nome in sem_ip:
+                return "0.0.0.0/0", None
+            return _ip_da_vlan(PLANO, vlan), str(PLANO["redes"][vlan]["gateway"])
+
+        def aguardar_stub(conn, timeout=45):
+            raise RuntimeError(
+                f"host não obteve IP via DHCP em {timeout}s (show ip: '0.0.0.0/0')"
+            )
+
+        with (
+            mock.patch.object(testes_aceite, "ler_ip_vpcs", ler_stub),
+            mock.patch.object(testes_aceite, "aguardar_dhcp", aguardar_stub),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            resultado = testes_aceite.teste_2_gateway(ctx)
+        return resultado, sessoes
+
+    def test_host_sem_ip_registra_falha_clara_e_nao_pinge(self) -> None:
+        resultado, sessoes = self._executar({"PC-LSI"})
+        self.assertFalse(resultado.ok)
+        self.assertTrue(
+            any("PC-LSI sem IP válido" in falha for falha in resultado.falhas)
+        )
+        # O host sem IP não gerou ping inconclusivo; os demais foram pingados.
+        pings = [nome for nome, cmd in sessoes.comandos if cmd.startswith("ping")]
+        self.assertNotIn("PC-LSI", pings)
+        com_gateway = [
+            nome
+            for nome, host in PLANO["hosts"].items()
+            if testes_aceite.gateway_esperado(PLANO, host)
+        ]
+        self.assertEqual(
+            sorted(pings), sorted(n for n in com_gateway if n != "PC-LSI")
+        )
+
+    def test_hosts_com_ip_pingam_o_gateway(self) -> None:
+        resultado, sessoes = self._executar(set())
+        self.assertTrue(resultado.ok)
+        com_gateway = [
+            nome
+            for nome, host in PLANO["hosts"].items()
+            if testes_aceite.gateway_esperado(PLANO, host)
+        ]
+        pings = [nome for nome, cmd in sessoes.comandos if cmd.startswith("ping")]
+        self.assertEqual(sorted(pings), sorted(com_gateway))
 
 
 if __name__ == "__main__":

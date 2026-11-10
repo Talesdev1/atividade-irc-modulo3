@@ -268,6 +268,19 @@ def parse_args() -> argparse.Namespace:
         default=5.0,
         help="Intervalo entre tentativas de conexão, em segundos (padrão: 5)",
     )
+    parser.add_argument(
+        "--dhcp-timeout",
+        type=int,
+        default=90,
+        help="Espera máxima, em segundos, pelo DHCP de cada host (padrão: 90)",
+    )
+    parser.add_argument(
+        "--ping-timeout",
+        type=int,
+        default=120,
+        help="Espera máxima, em segundos, pela saída de cada ping no console "
+        "(padrão: 120)",
+    )
     return parser.parse_args()
 
 
@@ -308,7 +321,11 @@ class Sessoes:
         )
 
     def ping(self, nome: str, destino: str) -> RespostaPing:
-        saida = self.comando(nome, f"ping {destino} -c {self.args.contagem}")
+        saida = self.comando(
+            nome,
+            f"ping {destino} -c {self.args.contagem}",
+            read_timeout=self.args.ping_timeout,
+        )
         return interpretar_ping(destino, saida)
 
     def fechar(self) -> None:
@@ -366,7 +383,7 @@ class Contexto:
                 valido = False
         if not valido:
             self.sessoes.comando(nome, "ip dhcp")
-            ip, _ = aguardar_dhcp(conexao)
+            ip, _ = aguardar_dhcp(conexao, timeout=self.args.dhcp_timeout)
         self.ips[nome] = ip.split("/")[0]
         return self.ips[nome]
 
@@ -396,8 +413,14 @@ def teste_1_dhcp(ctx: Contexto) -> Resultado:
     for nome, host in ctx.plano["hosts"].items():
         if host["modo"] != "dhcp":
             continue
-        ctx.sessoes.comando(nome, "ip dhcp")
-        ip, gateway = aguardar_dhcp(ctx.sessoes.vpcs(nome))
+        try:
+            ctx.sessoes.comando(nome, "ip dhcp")
+            ip, gateway = aguardar_dhcp(
+                ctx.sessoes.vpcs(nome), timeout=ctx.args.dhcp_timeout
+            )
+        except Exception as exc:  # noqa: BLE001 - registra e segue nos demais
+            ctx.registrar(f"{nome} não obteve IP via DHCP", False, str(exc))
+            continue
         ctx.ips[nome] = ip.split("/")[0]
 
         rede = ipaddress.ip_network(ctx.plano["redes"][host["vlan"]]["rede"])
@@ -415,6 +438,14 @@ def teste_2_gateway(ctx: Contexto) -> Resultado:
     for nome, host in ctx.plano["hosts"].items():
         gateway = gateway_esperado(ctx.plano, host)
         if not gateway:
+            continue
+        try:
+            # Garante endereçamento válido antes do ping: um host sem IP
+            # (DHCP que falhou no Teste 1, ou execução isolada com --only 2)
+            # produz resposta inconclusiva do VPCS no lugar de um diagnóstico.
+            ctx.ip_atual(nome)
+        except Exception as exc:  # noqa: BLE001 - registra e segue nos demais
+            ctx.registrar(f"{nome} sem IP válido", False, str(exc))
             continue
         ctx.ping_esperado(nome, gateway)
     return _resultado(2, ctx)
@@ -479,7 +510,10 @@ def teste_6_soberania_vlan(ctx: Contexto) -> Resultado:
     finally:
         try:
             ctx.sessoes.comando(ORIGEM_INTER_VLAN, "ip dhcp")
-            ip, gateway = aguardar_dhcp(ctx.sessoes.vpcs(ORIGEM_INTER_VLAN))
+            ip, gateway = aguardar_dhcp(
+                ctx.sessoes.vpcs(ORIGEM_INTER_VLAN),
+                timeout=ctx.args.dhcp_timeout,
+            )
         except Exception as exc:  # noqa: BLE001 - nunca mascarar o teste
             ctx.registrar("restauração do DHCP falhou", False, str(exc))
         else:
