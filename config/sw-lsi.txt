@@ -1,0 +1,283 @@
+#
+# Module devmgr configuration.
+#
+configure sys-recovery-level switch reset
+
+#
+# Module vlan configuration.
+#
+configure vlan default delete ports all
+configure vr VR-Default delete ports 1-23
+configure vr VR-Default add ports 1-23
+create qosprofile "QP2"
+create qosprofile "QP3"
+create qosprofile "QP4"
+create qosprofile "QP5"
+create qosprofile "QP6"
+create qosprofile "QP7"
+create vlan "Cameras"
+configure vlan Cameras tag 60
+create vlan "Gerencia"
+configure vlan Gerencia tag 70
+create vlan "LACINA"
+configure vlan LACINA tag 20
+create vlan "LSD"
+configure vlan LSD tag 10
+create vlan "LSI"
+configure vlan LSI tag 30
+create vlan "WiFi"
+configure vlan WiFi tag 50
+configure vlan Cameras add ports 22-23 tagged  
+configure vlan Default add ports 3-21 untagged  
+configure vlan Gerencia add ports 22-23 tagged  
+configure vlan LACINA add ports 22-23 tagged  
+configure vlan LSD add ports 22-23 tagged  
+configure vlan LSI add ports 22-23 tagged  
+configure vlan LSI add ports 1-2 untagged  
+configure vlan WiFi add ports 22-23 tagged  
+configure vlan Gerencia ipaddress 172.20.2.163 255.255.255.240
+configure qosscheduler strict-priority ports 1 
+configure qosscheduler strict-priority ports 2 
+configure qosscheduler strict-priority ports 3 
+configure qosscheduler strict-priority ports 4 
+configure qosscheduler strict-priority ports 5 
+configure qosscheduler strict-priority ports 6 
+configure qosscheduler strict-priority ports 7 
+configure qosscheduler strict-priority ports 8 
+configure qosscheduler strict-priority ports 9 
+configure qosscheduler strict-priority ports 10 
+configure qosscheduler strict-priority ports 11 
+configure qosscheduler strict-priority ports 12 
+configure qosscheduler strict-priority ports 13 
+configure qosscheduler strict-priority ports 14 
+configure qosscheduler strict-priority ports 15 
+configure qosscheduler strict-priority ports 16 
+configure qosscheduler strict-priority ports 17 
+configure qosscheduler strict-priority ports 18 
+configure qosscheduler strict-priority ports 19 
+configure qosscheduler strict-priority ports 20 
+configure qosscheduler strict-priority ports 21 
+configure qosscheduler strict-priority ports 22 
+configure qosscheduler strict-priority ports 23 
+
+#
+# Module mcmgr configuration.
+#
+
+#
+# Module otm configuration.
+#
+
+#
+# Module fdb configuration.
+#
+disable iparp vr VR-Mgmt refresh
+disable neighbor-discovery vr VR-Mgmt refresh
+
+#
+# Module rtmgr configuration.
+#
+configure iproute add default 172.20.2.161
+
+#
+# Module policy configuration.
+#
+configure policy slices tci-overwrite 0
+
+#
+# Module aaa configuration.
+#
+
+#
+# Module acl configuration.
+#
+
+
+
+
+#
+# Module bfd configuration.
+#
+
+#
+# Module bgp configuration.
+#
+
+#
+# Module cfgmgr configuration.
+#
+
+#
+# Module dnsAnalytics configuration.
+#
+
+#
+# Module dosprotect configuration.
+#
+
+#
+# Module dot1ag configuration.
+#
+
+#
+# Module eaps configuration.
+#
+
+#
+# Module edp configuration.
+#
+
+#
+# Module elrp configuration.
+#
+
+#
+# Module ems configuration.
+#
+
+#
+# Module epm configuration.
+#
+
+#
+# Module erps configuration.
+#
+
+#
+# Module esrp configuration.
+#
+
+#
+# Module ethoam configuration.
+#
+
+#
+# Module etmon configuration.
+#
+
+#
+# Module exsshd configuration.
+#
+
+#
+# Module hal configuration.
+#
+
+#
+# Module idMgr configuration.
+#
+
+#
+# Module ipSecurity configuration.
+#
+
+
+#
+# Module iqagent configuration.
+#
+
+#
+# Module isis configuration.
+#
+
+#
+# Module lldp configuration.
+#
+
+#
+# Module mrp configuration.
+#
+
+#
+# Module msdp configuration.
+#
+
+#
+# Module netDb configuration.
+#
+
+#
+# Module netLogin configuration.
+#
+
+#
+# Module netTools configuration.
+#
+enable dhcp vlan Default
+
+#
+# Module nodealias configuration.
+#
+
+#
+# Module ntp configuration.
+#
+
+#
+# Module ospf configuration.
+#
+
+#
+# Module ospfv3 configuration.
+#
+
+#
+# Module pim configuration.
+#
+
+#
+# Module poe configuration.
+#
+
+#
+# Module rip configuration.
+#
+
+#
+# Module ripng configuration.
+#
+
+#
+# Module snmpMaster configuration.
+#
+configure snmpv3 engine-id 03:0c:df:53:35:00:00
+
+#
+# Module stp configuration.
+#
+
+#
+# Module techSupport configuration.
+#
+
+#
+# Module telnetd configuration.
+#
+
+#
+# Module tftpd configuration.
+#
+
+#
+# Module thttpd configuration.
+#
+
+#
+# Module twamp configuration.
+#
+
+#
+# Module vmt configuration.
+#
+
+#
+# Module vrrp configuration.
+#
+
+#
+# Module vsm configuration.
+#
+
+#
+# Module vpex configuration.
+#
